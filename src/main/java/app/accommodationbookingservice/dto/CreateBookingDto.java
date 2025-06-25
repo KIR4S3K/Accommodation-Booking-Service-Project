@@ -1,8 +1,8 @@
 package app.accommodationbookingservice.dto;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.AssertTrue;
 import java.time.LocalDate;
 import lombok.Data;
 
