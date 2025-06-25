@@ -1,5 +1,7 @@
 package app.accommodationbookingservice.controller;
 
+import app.accommodationbookingservice.dto.RegisterRequestDto;
+import app.accommodationbookingservice.dto.UserDto;
 import app.accommodationbookingservice.model.User;
 import app.accommodationbookingservice.security.JwtTokenProvider;
 import app.accommodationbookingservice.service.UserService;
@@ -17,34 +19,56 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
-    private final AuthenticationManager authManager;
-    private final JwtTokenProvider jwt;
-    private final UserService userService;
-    private final PasswordEncoder encoder;
 
-    public AuthController(AuthenticationManager authManager,
-                          JwtTokenProvider jwt,
-                          UserService userService,
-                          PasswordEncoder encoder) {
-        this.authManager = authManager;
-        this.jwt = jwt;
+    private final AuthenticationManager authenticationManager;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final UserService userService;
+    private final PasswordEncoder passwordEncoder;
+
+    public AuthController(
+            AuthenticationManager authenticationManager,
+            JwtTokenProvider jwtTokenProvider,
+            UserService userService,
+            PasswordEncoder passwordEncoder) {
+        this.authenticationManager = authenticationManager;
+        this.jwtTokenProvider = jwtTokenProvider;
         this.userService = userService;
-        this.encoder = encoder;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @PostMapping("/register")
-    public ResponseEntity<User> register(@RequestBody User u) {
+    public ResponseEntity<UserDto> register(@RequestBody RegisterRequestDto requestDto) {
+        User user = new User();
+        user.setEmail(requestDto.getEmail());
+        user.setFirstName(requestDto.getFirstName());
+        user.setLastName(requestDto.getLastName());
+        user.setPassword(passwordEncoder.encode(requestDto.getPassword()));
+        user.setRole(requestDto.getRole());
 
-        return ResponseEntity.ok(userService.register(u));
+        User savedUser = userService.register(user);
+
+        UserDto responseDto = new UserDto();
+        responseDto.setId(savedUser.getId());
+        responseDto.setEmail(savedUser.getEmail());
+        responseDto.setFirstName(savedUser.getFirstName());
+        responseDto.setLastName(savedUser.getLastName());
+        responseDto.setRole(savedUser.getRole());
+
+        return ResponseEntity.ok(responseDto);
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Map<String, String>> login(@RequestBody Map<String, String> body) {
-        Authentication auth = authManager.authenticate(
-                new UsernamePasswordAuthenticationToken(body.get("email"), body.get("password"))
+    public ResponseEntity<Map<String, String>> login(@RequestBody Map<String, String> credentials) {
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        credentials.get("email"),
+                        credentials.get("password")
+                )
         );
-        String token = jwt.createToken(auth.getName(),
-                auth.getAuthorities().iterator().next().getAuthority());
+        String token = jwtTokenProvider.createToken(
+                authentication.getName(),
+                authentication.getAuthorities().iterator().next().getAuthority()
+        );
         return ResponseEntity.ok(Map.of("token", token));
     }
 }
