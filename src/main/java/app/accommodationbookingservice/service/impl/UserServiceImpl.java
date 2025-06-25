@@ -12,8 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional
 public class UserServiceImpl implements UserService {
+
     private final UserRepository repo;
     private final PasswordEncoder encoder;
     private final JwtTokenProvider jwt;
@@ -28,6 +28,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public User register(User u) {
         u.setPassword(encoder.encode(u.getPassword()));
         u.setRole(UserRole.CUSTOMER);
@@ -35,26 +36,32 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public User updateRole(Long id, String role) {
         User u = repo.findById(id).orElseThrow(
-                () -> new UsernameNotFoundException("User not found: " + id)
+                () -> new UsernameNotFoundException("User not found: "
+                        + id)
         );
         u.setRole(UserRole.valueOf(role));
         return repo.save(u);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public User findByEmail(String email) {
         return repo.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: "
+                        + email));
     }
 
     @Override
+    @Transactional
     public User save(User u) {
         return repo.save(u);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<User> findAll() {
         return repo.findAll();
     }
