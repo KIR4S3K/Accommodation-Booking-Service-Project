@@ -1,6 +1,8 @@
 package app.accommodationbookingservice.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -10,12 +12,14 @@ import app.accommodationbookingservice.mapper.AccommodationMapper;
 import app.accommodationbookingservice.model.Accommodation;
 import app.accommodationbookingservice.service.AccommodationService;
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 class AccommodationControllerTest {
@@ -64,6 +68,16 @@ class AccommodationControllerTest {
     }
 
     @Test
+    void list_returnsEmpty() {
+        when(svc.findAll()).thenReturn(Collections.emptyList());
+
+        ResponseEntity<List<AccommodationDto>> resp = ctrl.list();
+        assertTrue(resp.getBody().isEmpty());
+
+        verify(svc).findAll();
+    }
+
+    @Test
     void create_withManagerRole_succeeds() {
         CreateAccommodationDto createDto = new CreateAccommodationDto();
         createDto.setLocation("XYZ");
@@ -86,5 +100,15 @@ class AccommodationControllerTest {
     void delete_invokesService() {
         ctrl.delete(42L);
         verify(svc).delete(42L);
+    }
+
+    @Test
+    void delete_notFound_returns404() {
+        doThrow(new RuntimeException("Not found")).when(svc).delete(999L);
+
+        ResponseEntity<Void> resp = ctrl.delete(999L);
+        assertEquals(HttpStatus.NOT_FOUND, resp.getStatusCode());
+
+        verify(svc).delete(999L);
     }
 }
