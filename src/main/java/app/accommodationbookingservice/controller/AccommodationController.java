@@ -30,7 +30,8 @@ public class AccommodationController {
     private final AccommodationService service;
     private final AccommodationMapper mapper;
 
-    public AccommodationController(AccommodationService service, AccommodationMapper mapper) {
+    public AccommodationController(AccommodationService service,
+                                   AccommodationMapper mapper) {
         this.service = service;
         this.mapper = mapper;
     }
@@ -73,7 +74,11 @@ public class AccommodationController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-        service.delete(id);
-        return ResponseEntity.noContent().build();
+        try {
+            service.delete(id);
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 }

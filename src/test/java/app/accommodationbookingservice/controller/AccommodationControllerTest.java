@@ -98,7 +98,8 @@ class AccommodationControllerTest {
 
     @Test
     void delete_invokesService() {
-        ctrl.delete(42L);
+        ResponseEntity<Void> resp = ctrl.delete(42L);
+        assertEquals(HttpStatus.NO_CONTENT, resp.getStatusCode());
         verify(svc).delete(42L);
     }
 
