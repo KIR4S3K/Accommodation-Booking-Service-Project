@@ -45,18 +45,31 @@ public class BookingServiceImpl implements BookingService {
     public Booking create(Booking b) {
         List<Payment> pending = paymentRepo.findPendingByUserId(b.getUserId());
         if (!pending.isEmpty()) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
+            throw new IllegalStateException(
                     "You have pending payments; please complete them before booking."
             );
         }
 
         validateDateRange(b.getCheckInDate(), b.getCheckOutDate());
-        checkOverlap(b);
+
+        boolean overlaps = repo.findByAccommodationIdAndStatusIn(
+                b.getAccommodationId(),
+                List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED)
+        ).stream().anyMatch(ex ->
+                !(b.getCheckOutDate().isBefore(ex.getCheckInDate().plusDays(1))
+                        || b.getCheckInDate().isAfter(ex.getCheckOutDate().minusDays(1)))
+        );
+        if (overlaps) {
+            throw new IllegalStateException(
+                    "Accommodation " + b.getAccommodationId()
+                            + " is already booked for these dates"
+            );
+        }
 
         Accommodation acc = accommodationRepo.findById(b.getAccommodationId())
-                .orElseThrow(() -> new EntityNotFoundException("Accommodation not found: "
-                        + b.getAccommodationId()));
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Accommodation not found: " + b.getAccommodationId()
+                ));
         if (acc.getAvailability() <= 0) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -68,13 +81,11 @@ public class BookingServiceImpl implements BookingService {
 
         b.setStatus(BookingStatus.PENDING);
         Booking saved = repo.save(b);
-
         try {
             notificationService.notify("New booking created: " + saved.getId());
         } catch (Exception ex) {
-            log.error("Failed to send notification for new booking {}", saved.getId(), ex);
+            log.error("Notification failed for new booking {}", saved.getId(), ex);
         }
-
         return saved;
     }
 
@@ -86,13 +97,27 @@ public class BookingServiceImpl implements BookingService {
         validateDateRange(b.getCheckInDate(), b.getCheckOutDate());
         existing.setCheckInDate(b.getCheckInDate());
         existing.setCheckOutDate(b.getCheckOutDate());
-        checkOverlap(existing);
+
+        boolean overlaps = repo.findByAccommodationIdAndStatusIn(
+                existing.getAccommodationId(),
+                List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED)
+        ).stream().anyMatch(ex ->
+                !(existing.getCheckOutDate().isBefore(ex.getCheckInDate().plusDays(1))
+                        || existing.getCheckInDate().isAfter(ex.getCheckOutDate()
+                        .minusDays(1)))
+        );
+        if (overlaps) {
+            throw new IllegalStateException(
+                    "Accommodation " + existing.getAccommodationId()
+                            + " is already booked for these dates"
+            );
+        }
 
         Booking updated = repo.save(existing);
         try {
             notificationService.notify("Booking updated: " + updated.getId());
         } catch (Exception ex) {
-            log.error("Failed to send notification for updated booking {}", updated.getId(), ex);
+            log.error("Notification failed for updated booking {}", updated.getId(), ex);
         }
         return updated;
     }
@@ -110,32 +135,34 @@ public class BookingServiceImpl implements BookingService {
         repo.save(existing);
 
         Accommodation acc = accommodationRepo.findById(existing.getAccommodationId())
-                .orElseThrow(() ->
-                        new EntityNotFoundException("Accommodation not found: "
-                                + existing.getAccommodationId()));
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Accommodation not found: " + existing.getAccommodationId()
+                ));
         acc.setAvailability(acc.getAvailability() + 1);
         accommodationRepo.save(acc);
 
         try {
             notificationService.notify("Booking canceled: " + existing.getId());
         } catch (Exception ex) {
-            log.error("Failed to send cancellation notification for booking {}", existing
-                    .getId(), ex);
+            log.error("Notification failed for canceled booking {}", existing.getId(), ex);
         }
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Booking findById(Long id) {
         return repo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Booking not found: " + id));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Booking> findByUser(Long userId) {
         return repo.findByUserId(userId);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Booking> findAll() {
         return repo.findAll();
     }
@@ -145,24 +172,6 @@ public class BookingServiceImpl implements BookingService {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Check-in date must be before check-out date"
-            );
-        }
-    }
-
-    private void checkOverlap(Booking b) {
-        List<Booking> existing = repo.findByAccommodationIdAndStatusIn(
-                b.getAccommodationId(),
-                List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED)
-        );
-        boolean overlaps = existing.stream().anyMatch(ex ->
-                !(b.getCheckOutDate().isBefore(ex.getCheckInDate().plusDays(1))
-                        || b.getCheckInDate().isAfter(ex.getCheckOutDate().minusDays(1)))
-        );
-        if (overlaps) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Accommodation " + b.getAccommodationId()
-                            + " is already booked for these dates"
             );
         }
     }
