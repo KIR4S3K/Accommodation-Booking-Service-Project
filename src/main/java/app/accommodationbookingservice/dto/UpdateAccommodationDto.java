@@ -4,8 +4,7 @@ import java.math.BigDecimal;
 import lombok.Data;
 
 @Data
-public class AccommodationDto {
-    private Long id;
+public class UpdateAccommodationDto {
     private String location;
     private BigDecimal dailyRate;
     private Integer availability;

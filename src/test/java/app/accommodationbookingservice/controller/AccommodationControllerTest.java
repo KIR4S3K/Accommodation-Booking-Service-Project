@@ -4,6 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import app.accommodationbookingservice.dto.AccommodationDto;
+import app.accommodationbookingservice.dto.CreateAccommodationDto;
+import app.accommodationbookingservice.mapper.AccommodationMapper;
 import app.accommodationbookingservice.model.Accommodation;
 import app.accommodationbookingservice.service.AccommodationService;
 import java.math.BigDecimal;
@@ -20,36 +23,63 @@ class AccommodationControllerTest {
     @Mock
     private AccommodationService svc;
 
+    @Mock
+    private AccommodationMapper mapper;
+
     @InjectMocks
     private AccommodationController ctrl;
 
     private Accommodation acc;
+    private AccommodationDto accDto;
 
     @BeforeEach
     void init() {
         MockitoAnnotations.openMocks(this);
+
         acc = Accommodation.builder()
                 .id(42L)
                 .location("XYZ")
                 .dailyRate(BigDecimal.valueOf(150))
                 .availability(3)
                 .build();
+
+        accDto = new AccommodationDto();
+        accDto.setId(42L);
+        accDto.setLocation("XYZ");
+        accDto.setDailyRate(BigDecimal.valueOf(150));
+        accDto.setAvailability(3);
     }
 
     @Test
     void list_returnsAll() {
         when(svc.findAll()).thenReturn(List.of(acc));
-        ResponseEntity<List<Accommodation>> resp = ctrl.list();
+        when(mapper.toDto(acc)).thenReturn(accDto);
+
+        ResponseEntity<List<AccommodationDto>> resp = ctrl.list();
         assertEquals(1, resp.getBody().size());
+        assertEquals(accDto, resp.getBody().get(0));
+
         verify(svc).findAll();
+        verify(mapper).toDto(acc);
     }
 
     @Test
     void create_withManagerRole_succeeds() {
+        CreateAccommodationDto createDto = new CreateAccommodationDto();
+        createDto.setLocation("XYZ");
+        createDto.setDailyRate(BigDecimal.valueOf(150));
+        createDto.setAvailability(3);
+
+        when(mapper.toEntity(createDto)).thenReturn(acc);
         when(svc.create(acc)).thenReturn(acc);
-        ResponseEntity<Accommodation> resp = ctrl.create(acc);
-        assertEquals(acc, resp.getBody());
+        when(mapper.toDto(acc)).thenReturn(accDto);
+
+        ResponseEntity<AccommodationDto> resp = ctrl.create(createDto);
+        assertEquals(accDto, resp.getBody());
+
+        verify(mapper).toEntity(createDto);
         verify(svc).create(acc);
+        verify(mapper).toDto(acc);
     }
 
     @Test
