@@ -5,6 +5,7 @@ import app.accommodationbookingservice.dto.UserDto;
 import app.accommodationbookingservice.model.User;
 import app.accommodationbookingservice.security.JwtTokenProvider;
 import app.accommodationbookingservice.service.UserService;
+import jakarta.validation.Valid;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -37,7 +38,8 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<UserDto> register(@RequestBody RegisterRequestDto requestDto) {
+    public ResponseEntity<UserDto> register(
+            @Valid @RequestBody RegisterRequestDto requestDto) {
         User user = new User();
         user.setEmail(requestDto.getEmail());
         user.setFirstName(requestDto.getFirstName());

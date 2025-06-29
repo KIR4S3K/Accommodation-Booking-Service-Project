@@ -5,6 +5,7 @@ import app.accommodationbookingservice.exception.PaymentException;
 import app.accommodationbookingservice.model.Accommodation;
 import app.accommodationbookingservice.model.Booking;
 import app.accommodationbookingservice.model.Payment;
+import app.accommodationbookingservice.model.enums.BookingStatus;
 import app.accommodationbookingservice.model.enums.PaymentStatus;
 import app.accommodationbookingservice.repository.AccommodationRepository;
 import app.accommodationbookingservice.repository.BookingRepository;
@@ -17,12 +18,14 @@ import com.stripe.param.checkout.SessionCreateParams;
 import java.math.BigDecimal;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional
 public class PaymentServiceImpl implements PaymentService {
+
     private final PaymentRepository paymentRepo;
     private final BookingRepository bookingRepo;
     private final AccommodationRepository accommodationRepo;
@@ -31,8 +34,7 @@ public class PaymentServiceImpl implements PaymentService {
     public PaymentServiceImpl(PaymentRepository paymentRepo,
                               BookingRepository bookingRepo,
                               AccommodationRepository accommodationRepo,
-                              @org.springframework.beans.factory
-                                      .annotation.Value("${stripe.secret-key}") String stripeKey) {
+                              @Value("${stripe.secret-key}") String stripeKey) {
         this.paymentRepo = paymentRepo;
         this.bookingRepo = bookingRepo;
         this.accommodationRepo = accommodationRepo;
@@ -49,16 +51,18 @@ public class PaymentServiceImpl implements PaymentService {
         Accommodation acc = accommodationRepo.findById(booking.getAccommodationId())
                 .orElseThrow(() -> new EntityNotFoundException("Accommodation not found: "
                         + booking.getAccommodationId()));
-        long days = ChronoUnit.DAYS.between(booking.getCheckInDate(), booking
-                .getCheckOutDate());
+
+        long days = ChronoUnit.DAYS.between(booking.getCheckInDate(), booking.getCheckOutDate());
         BigDecimal amount = acc.getDailyRate().multiply(BigDecimal.valueOf(days));
 
         SessionCreateParams.LineItem.PriceData priceData =
                 SessionCreateParams.LineItem.PriceData.builder()
                         .setCurrency("usd")
-                        .setUnitAmount(amount.multiply(BigDecimal.valueOf(100)).longValue())
+                        .setUnitAmount(amount.multiply(BigDecimal.valueOf(100))
+                                .longValueExact())
                         .setProductData(
-                                SessionCreateParams.LineItem.PriceData.ProductData.builder()
+                                SessionCreateParams.LineItem.PriceData.ProductData
+                                        .builder()
                                         .setName("Booking " + bookingId)
                                         .build()
                         )
@@ -97,11 +101,20 @@ public class PaymentServiceImpl implements PaymentService {
         Payment p = paymentRepo.findBySessionId(sessionId)
                 .orElseThrow(() -> new EntityNotFoundException("Payment not found: "
                         + sessionId));
+
         if (p.getStatus() != PaymentStatus.PENDING) {
             throw new PaymentException("Cannot mark payment as paid in status: "
                     + p.getStatus());
         }
+
+        Booking booking = bookingRepo.findById(p.getBookingId())
+                .orElseThrow(() -> new EntityNotFoundException("Booking not found: "
+                        + p.getBookingId()));
+
         p.setStatus(PaymentStatus.PAID);
+        booking.setStatus(BookingStatus.CONFIRMED);
+
+        bookingRepo.save(booking);
         return paymentRepo.save(p);
     }
 
@@ -116,7 +129,8 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional(readOnly = true)
     public List<Payment> findByBooking(Long bookingId) {
-        return paymentRepo.findByBookingId(bookingId);
+        return paymentRepo
+                .findByBookingId(bookingId);
     }
 
     @Override

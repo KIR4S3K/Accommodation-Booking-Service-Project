@@ -1,7 +1,6 @@
 package app.accommodationbookingservice.service.impl;
 
 import app.accommodationbookingservice.exception.AlreadyCanceledException;
-import app.accommodationbookingservice.exception.EntityNotFoundException;
 import app.accommodationbookingservice.model.Accommodation;
 import app.accommodationbookingservice.model.Booking;
 import app.accommodationbookingservice.model.Payment;
@@ -45,7 +44,8 @@ public class BookingServiceImpl implements BookingService {
     public Booking create(Booking b) {
         List<Payment> pending = paymentRepo.findPendingByUserId(b.getUserId());
         if (!pending.isEmpty()) {
-            throw new IllegalStateException(
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
                     "You have pending payments; please complete them before booking."
             );
         }
@@ -53,21 +53,23 @@ public class BookingServiceImpl implements BookingService {
         validateDateRange(b.getCheckInDate(), b.getCheckOutDate());
 
         boolean overlaps = repo.findByAccommodationIdAndStatusIn(
-                b.getAccommodationId(),
-                List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED)
-        ).stream().anyMatch(ex ->
-                !(b.getCheckOutDate().isBefore(ex.getCheckInDate().plusDays(1))
-                        || b.getCheckInDate().isAfter(ex.getCheckOutDate().minusDays(1)))
-        );
+                        b.getAccommodationId(),
+                        List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED)
+                ).stream()
+                .anyMatch(ex ->
+                        !(b.getCheckOutDate().isBefore(ex.getCheckInDate().plusDays(1))
+                                || b.getCheckInDate().isAfter(ex.getCheckOutDate().minusDays(1)))
+                );
         if (overlaps) {
-            throw new IllegalStateException(
-                    "Accommodation " + b.getAccommodationId()
-                            + " is already booked for these dates"
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Accommodation " + b.getAccommodationId() + " is already booked for these dates"
             );
         }
 
-        Accommodation acc = accommodationRepo.findById(b.getAccommodationId())
-                .orElseThrow(() -> new EntityNotFoundException(
+        Accommodation acc = accommodationRepo.findByIdForUpdate(b.getAccommodationId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
                         "Accommodation not found: " + b.getAccommodationId()
                 ));
         if (acc.getAvailability() <= 0) {
@@ -76,38 +78,48 @@ public class BookingServiceImpl implements BookingService {
                     "No availability for accommodation " + b.getAccommodationId()
             );
         }
+
         acc.setAvailability(acc.getAvailability() - 1);
         accommodationRepo.save(acc);
 
         b.setStatus(BookingStatus.PENDING);
         Booking saved = repo.save(b);
+
         try {
             notificationService.notify("New booking created: " + saved.getId());
         } catch (Exception ex) {
             log.error("Notification failed for new booking {}", saved.getId(), ex);
         }
+
         return saved;
     }
 
     @Override
     public Booking update(Long id, Booking b) {
         Booking existing = repo.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Booking not found: " + id));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Booking not found: " + id
+                ));
 
         validateDateRange(b.getCheckInDate(), b.getCheckOutDate());
         existing.setCheckInDate(b.getCheckInDate());
         existing.setCheckOutDate(b.getCheckOutDate());
 
         boolean overlaps = repo.findByAccommodationIdAndStatusIn(
-                existing.getAccommodationId(),
-                List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED)
-        ).stream().anyMatch(ex ->
-                !(existing.getCheckOutDate().isBefore(ex.getCheckInDate().plusDays(1))
-                        || existing.getCheckInDate().isAfter(ex.getCheckOutDate()
-                        .minusDays(1)))
-        );
+                        existing.getAccommodationId(),
+                        List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED)
+                ).stream()
+                .anyMatch(ex ->
+                        !(existing.getCheckOutDate().isBefore(ex.getCheckInDate()
+                                .plusDays(1))
+                                || existing.getCheckInDate().isAfter(ex.getCheckOutDate()
+                                .minusDays(1)))
+
+                );
         if (overlaps) {
-            throw new IllegalStateException(
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
                     "Accommodation " + existing.getAccommodationId()
                             + " is already booked for these dates"
             );
@@ -125,7 +137,10 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public void cancel(Long id) {
         Booking existing = repo.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Booking not found: " + id));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Booking not found: " + id
+                ));
 
         if (existing.getStatus() == BookingStatus.CANCELED) {
             throw new AlreadyCanceledException("Booking already canceled: " + id);
@@ -134,8 +149,9 @@ public class BookingServiceImpl implements BookingService {
         existing.setStatus(BookingStatus.CANCELED);
         repo.save(existing);
 
-        Accommodation acc = accommodationRepo.findById(existing.getAccommodationId())
-                .orElseThrow(() -> new EntityNotFoundException(
+        Accommodation acc = accommodationRepo.findByIdForUpdate(existing.getAccommodationId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
                         "Accommodation not found: " + existing.getAccommodationId()
                 ));
         acc.setAvailability(acc.getAvailability() + 1);
@@ -152,7 +168,10 @@ public class BookingServiceImpl implements BookingService {
     @Transactional(readOnly = true)
     public Booking findById(Long id) {
         return repo.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Booking not found: " + id));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Booking not found: " + id
+                ));
     }
 
     @Override
