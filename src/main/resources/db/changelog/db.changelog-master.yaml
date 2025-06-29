@@ -1,0 +1,122 @@
+databaseChangeLog:
+  - changeSet:
+      id: 1
+      author: mateusz
+      changes:
+        - createTable:
+            tableName: users
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: email
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: first_name
+                  type: VARCHAR(100)
+              - column:
+                  name: last_name
+                  type: VARCHAR(100)
+              - column:
+                  name: password
+                  type: VARCHAR(255)
+              - column:
+                  name: role
+                  type: VARCHAR(50)
+
+  - changeSet:
+      id: 2
+      author: mateusz
+      changes:
+        - createTable:
+            tableName: accommodations
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: type
+                  type: VARCHAR(50)
+              - column:
+                  name: location
+                  type: VARCHAR(255)
+              - column:
+                  name: size
+                  type: VARCHAR(100)
+              - column:
+                  name: amenities
+                  type: VARCHAR(1000)
+              - column:
+                  name: daily_rate
+                  type: DECIMAL(19,2)
+              - column:
+                  name: availability
+                  type: INT
+
+  - changeSet:
+      id: 3
+      author: mateusz
+      changes:
+        - createTable:
+            tableName: bookings
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: check_in_date
+                  type: DATE
+              - column:
+                  name: check_out_date
+                  type: DATE
+              - column:
+                  name: accommodation_id
+                  type: BIGINT
+              - column:
+                  name: user_id
+                  type: BIGINT
+              - column:
+                  name: status
+                  type: VARCHAR(50)
+
+  - changeSet:
+      id: 4
+      author: mateusz
+      changes:
+        - createTable:
+            tableName: payments
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: status
+                  type: VARCHAR(50)
+              - column:
+                  name: booking_id
+                  type: BIGINT
+              - column:
+                  name: session_url
+                  type: VARCHAR(500)
+              - column:
+                  name: session_id
+                  type: VARCHAR(255)
+              - column:
+                  name: amount_to_pay
+                  type: DECIMAL(19,2)
